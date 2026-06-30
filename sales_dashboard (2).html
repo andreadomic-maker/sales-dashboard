@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Sales Activations Dashboard</title>
+<style>
+  :root{
+    --bg: #0b0e14;
+    --panel: #131722;
+    --panel-2: #161b29;
+    --line: #232a3b;
+    --text: #e7eaf2;
+    --muted: #8893a8;
+    --accent: #6ee7d6;
+    --accent2: #f5a55a;
+    --accent3: #c084fc;
+    --red: #f06868;
+    --mono: 'IBM Plex Mono','SFMono-Regular',Consolas,monospace;
+    --sans: 'Inter','Segoe UI',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(110,231,214,0.07), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgba(192,132,252,0.06), transparent 60%),
+      var(--bg);
+    color:var(--text); font-family:var(--sans); min-height:100vh;
+  }
+  header{
+    padding:28px 36px 18px; border-bottom:1px solid var(--line);
+    display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:14px;
+  }
+  header h1{ margin:0; font-size:22px; font-weight:700; letter-spacing:-0.01em; }
+  header .eyebrow{
+    font-family:var(--mono); font-size:11px; letter-spacing:0.12em; color:var(--accent);
+    text-transform:uppercase; margin-bottom:6px;
+  }
+  header p{margin:4px 0 0; color:var(--muted); font-size:13px;}
+  .kpis{display:flex; gap:10px; flex-wrap:wrap;}
+  .kpi{ background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px 16px; min-width:120px; }
+  .kpi .label{font-family:var(--mono); font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em;}
+  .kpi .value{font-size:20px; font-weight:700; margin-top:3px;}
+  .kpi .value.accent{color:var(--accent);}
+  .kpi .value.warn{color:var(--accent2);}
+
+  nav{ display:flex; gap:4px; padding:14px 36px 0; border-bottom:1px solid var(--line); overflow-x:auto; }
+  nav button{
+    background:transparent; border:none; color:var(--muted); font-family:var(--sans);
+    font-size:13.5px; font-weight:600; padding:10px 16px; cursor:pointer;
+    border-bottom:2px solid transparent; white-space:nowrap; transition:color .15s, border-color .15s;
+  }
+  nav button:hover{color:var(--text);}
+  nav button.active{color:var(--accent); border-bottom-color:var(--accent);}
+
+  main{padding:28px 36px 60px;}
+  .tabpanel{display:none;}
+  .tabpanel.active{display:block;}
+
+  .grid{display:grid; gap:18px;}
+  .grid.cols-2{grid-template-columns:1.4fr 1fr;}
+  .grid.cols-3{grid-template-columns:repeat(3,1fr);}
+  @media(max-width:980px){ .grid.cols-2, .grid.cols-3{grid-template-columns:1fr;} }
+
+  .card{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:18px 20px; }
+  .card h3{margin:0 0 2px; font-size:14px; font-weight:700;}
+  .card .sub{font-size:11.5px; color:var(--muted); margin-bottom:14px;}
+  .card.note{
+    background:linear-gradient(135deg, rgba(110,231,214,0.08), rgba(192,132,252,0.05));
+    border-color:rgba(110,231,214,0.25);
+  }
+  .card.note p{font-size:13px; line-height:1.6; color:var(--text); margin:0;}
+  .card.note strong{color:var(--accent);}
+
+  svg{width:100%; display:block; overflow:visible;}
+  svg text{fill:var(--muted); font-family:var(--sans);}
+  .axis-line{stroke:#1c2233; stroke-width:1;}
+  .grid-line{stroke:#1c2233; stroke-width:1;}
+
+  .chip-row{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px;}
+  .chip{
+    font-family:var(--mono); font-size:11px; padding:5px 10px; border-radius:999px;
+    border:1px solid var(--line); color:var(--muted); cursor:pointer; user-select:none;
+  }
+  .chip.active{ color:var(--bg); font-weight:700; }
+
+  .legend{display:flex; gap:14px; flex-wrap:wrap; margin-top:10px; font-size:11px; color:var(--muted);}
+  .legend span{display:inline-flex; align-items:center; gap:6px;}
+  .legend i{width:10px; height:10px; border-radius:3px; display:inline-block;}
+
+  table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  th, td{padding:7px 8px; text-align:right; border-bottom:1px solid var(--line);}
+  th:first-child, td:first-child{text-align:left; color:var(--muted);}
+  thead th{color:var(--muted); font-weight:600; font-family:var(--mono); font-size:10.5px; text-transform:uppercase;}
+  tbody tr:hover{background:var(--panel-2);}
+  td.total{font-weight:700; color:var(--accent);}
+
+  .cat-select{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
+  .cat-btn{
+    background:var(--panel); border:1px solid var(--line); color:var(--text);
+    padding:9px 14px; border-radius:10px; font-size:13px; font-weight:600; cursor:pointer;
+  }
+  .cat-btn.active{ border-color:var(--accent); color:var(--accent); background:rgba(110,231,214,0.07);}
+
+  .tooltip{
+    position:fixed; pointer-events:none; background:#0f1320; border:1px solid var(--line);
+    border-radius:8px; padding:8px 10px; font-size:11.5px; font-family:var(--mono);
+    color:var(--text); z-index:50; display:none; box-shadow:0 8px 24px rgba(0,0,0,0.5);
+  }
+
+  footer{padding:20px 36px; color:var(--muted); font-size:11px; border-top:1px solid var(--line); font-family:var(--mono);}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="eyebrow">Activations / Sales Tracker · Jan 2025 – Jun 2026</div>
+    <h1>Tariff Segment &amp; Channel Performance</h1>
+    <p>Monthly unit activations across product segments and sales channels</p>
+  </div>
+  <div class="kpis" id="kpiRow"></div>
+</header>
+
+<nav id="tabs"></nav>
+<main id="panels"></main>
+<div class="tooltip" id="tooltip"></div>
+
+<footer>Source: Book1.xlsx pivot export · dark dashboard generated from uploaded data</footer>
+
+<script>
+const DATA = {"months": ["2025 - JAN", "2025 - FEB", "2025 - MAR", "2025 - APR", "2025 - MAY", "2025 - JUN", "2025 - JUL", "2025 - AUG", "2025 - SEP", "2025 - OCT", "2025 - NOV", "2025 - DEC", "2026 - JAN", "2026 - FEB", "2026 - MAR", "2026 - APR", "2026 - MAY", "2026 - JUN"], "categories": {"Druga +": {"total": 797, "monthly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 129, 217, 197, 254], "channels": {"Online Sales": {"total": 60, "monthly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 21, 13, 21]}, "PC Partner ASP/D2D": {"total": 30, "monthly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 10, 11, 7]}, "PC Partner Telesales": {"total": 146, "monthly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 32, 31, 64]}, "PC Proprietary D2D": {"total": 19, "monthly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 10, 4, 3]}, "PC Proprietary Telesales": {"total": 151, "monthly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 42, 40, 54]}, "RC Partner Network": {"total": 191, "monthly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 39, 59, 53, 40]}, "RC Proprietary Vip Network": {"total": 122, "monthly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 30, 26, 22, 44]}, "RCC": {"total": 77, "monthly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 17, 17, 22, 21]}, "Unknown": {"total": 1, "monthly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0]}}}, "Prva +": {"total": 1569, "monthly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 164, 278, 244, 883], "channels": {"Online Sales": {"total": 85, "monthly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 17, 15, 48]}, "PC Partner ASP/D2D": {"total": 7, "monthly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 1, 1, 0]}, "PC Partner Telesales": {"total": 489, "monthly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 85, 77, 292]}, "PC Proprietary D2D": {"total": 56, "monthly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 14, 7, 30]}, "PC Proprietary Telesales": {"total": 277, "monthly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 17, 37, 45, 178]}, "RC Partner Network": {"total": 360, "monthly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 54, 79, 56, 171]}, "RC Proprietary Vip Network": {"total": 228, "monthly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 26, 29, 140]}, "RCC": {"total": 64, "monthly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 18, 14, 22]}, "Unknown": {"total": 3, "monthly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2]}}}, "TAMAN MALA": {"total": 4396, "monthly": [403, 214, 103, 149, 178, 117, 421, 433, 596, 524, 342, 434, 203, 218, 61, 0, 0, 0], "channels": {"Online Sales": {"total": 179, "monthly": [28, 17, 6, 3, 8, 12, 15, 5, 14, 15, 12, 12, 10, 19, 3, 0, 0, 0]}, "Internal Sales": {"total": 2, "monthly": [0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]}, "PC Partner ASP/D2D": {"total": 240, "monthly": [2, 2, 0, 0, 1, 2, 27, 31, 50, 17, 15, 24, 20, 35, 14, 0, 0, 0]}, "PC Partner Telesales": {"total": 167, "monthly": [6, 8, 3, 6, 2, 7, 19, 29, 29, 28, 5, 8, 5, 5, 7, 0, 0, 0]}, "PC Proprietary D2D": {"total": 51, "monthly": [2, 1, 2, 0, 1, 1, 5, 8, 10, 4, 3, 5, 4, 5, 0, 0, 0, 0]}, "PC Proprietary Telesales": {"total": 870, "monthly": [26, 26, 10, 39, 16, 21, 114, 95, 80, 151, 74, 122, 52, 37, 7, 0, 0, 0]}, "RC Partner Network": {"total": 1798, "monthly": [230, 69, 49, 49, 80, 38, 161, 189, 268, 188, 170, 179, 63, 49, 16, 0, 0, 0]}, "RC Proprietary Vip Network": {"total": 851, "monthly": [85, 59, 20, 37, 47, 26, 71, 62, 121, 99, 51, 65, 40, 58, 10, 0, 0, 0]}, "RCC": {"total": 230, "monthly": [24, 29, 11, 15, 23, 8, 9, 14, 23, 22, 11, 19, 9, 9, 4, 0, 0, 0]}, "Unknown": {"total": 8, "monthly": [0, 2, 2, 0, 0, 2, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0]}}}, "TAMAN SREDNJA": {"total": 1738, "monthly": [230, 77, 24, 28, 30, 45, 222, 248, 305, 193, 131, 117, 42, 37, 9, 0, 0, 0], "channels": {"Online Sales": {"total": 152, "monthly": [34, 18, 4, 6, 4, 10, 6, 8, 12, 11, 7, 16, 5, 9, 2, 0, 0, 0]}, "Internal Sales": {"total": 1, "monthly": [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}, "PC Partner ASP/D2D": {"total": 42, "monthly": [0, 0, 0, 0, 0, 0, 6, 13, 10, 1, 1, 3, 4, 2, 2, 0, 0, 0]}, "PC Partner Telesales": {"total": 110, "monthly": [6, 8, 5, 2, 0, 3, 9, 19, 35, 11, 1, 6, 2, 1, 2, 0, 0, 0]}, "PC Proprietary D2D": {"total": 85, "monthly": [1, 2, 0, 0, 0, 0, 12, 12, 40, 13, 1, 0, 2, 2, 0, 0, 0, 0]}, "PC Proprietary Telesales": {"total": 198, "monthly": [13, 11, 2, 4, 8, 4, 26, 27, 29, 22, 20, 20, 5, 6, 1, 0, 0, 0]}, "RC Partner Network": {"total": 804, "monthly": [116, 15, 9, 8, 13, 12, 131, 117, 131, 94, 78, 56, 13, 10, 1, 0, 0, 0]}, "RC Proprietary Vip Network": {"total": 225, "monthly": [36, 6, 1, 5, 3, 5, 29, 42, 39, 26, 13, 9, 5, 5, 1, 0, 0, 0]}, "RCC": {"total": 108, "monthly": [23, 16, 3, 2, 2, 10, 3, 9, 8, 11, 9, 6, 4, 2, 0, 0, 0, 0]}, "Unknown": {"total": 13, "monthly": [1, 1, 0, 1, 0, 1, 0, 0, 1, 4, 1, 1, 2, 0, 0, 0, 0, 0]}}}, "TAMAN VELIKA": {"total": 24882, "monthly": [1407, 3468, 4543, 2080, 2146, 2001, 862, 385, 493, 1335, 1077, 1351, 1459, 1565, 705, 3, 1, 1], "channels": {"Online Sales": {"total": 2345, "monthly": [84, 270, 348, 114, 109, 114, 144, 172, 200, 183, 151, 172, 126, 107, 51, 0, 0, 0]}, "Internal Sales": {"total": 4, "monthly": [0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]}, "PC Partner ASP/D2D": {"total": 1537, "monthly": [51, 147, 284, 242, 221, 196, 97, 2, 0, 70, 51, 61, 44, 55, 16, 0, 0, 0]}, "PC Partner Telesales": {"total": 2995, "monthly": [158, 229, 384, 262, 284, 226, 84, 10, 7, 171, 216, 275, 221, 266, 202, 0, 0, 0]}, "PC Proprietary D2D": {"total": 961, "monthly": [107, 102, 151, 92, 89, 80, 38, 0, 12, 103, 45, 39, 27, 54, 22, 0, 0, 0]}, "PC Proprietary Telesales": {"total": 5167, "monthly": [200, 851, 1428, 327, 294, 253, 151, 89, 123, 375, 186, 245, 253, 271, 119, 2, 0, 0]}, "RC Partner Network": {"total": 7139, "monthly": [607, 1166, 1058, 659, 704, 697, 179, 74, 85, 247, 250, 339, 457, 474, 143, 0, 0, 0]}, "RC Proprietary Bnet/Tomato network": {"total": 1, "monthly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0]}, "RC Proprietary Vip Network": {"total": 3348, "monthly": [156, 473, 622, 291, 330, 336, 104, 14, 23, 125, 120, 140, 246, 271, 97, 0, 0, 0]}, "RCC": {"total": 1372, "monthly": [44, 228, 266, 91, 114, 98, 64, 24, 43, 61, 57, 79, 84, 65, 53, 1, 0, 0]}, "Unknown": {"total": 13, "monthly": [0, 2, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1, 1]}}}, "Treća +": {"total": 3232, "monthly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 628, 880, 807, 917], "channels": {"Online Sales": {"total": 78, "monthly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 17, 12, 39]}, "PC Partner ASP/D2D": {"total": 296, "monthly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 56, 94, 77, 69]}, "PC Partner Telesales": {"total": 330, "monthly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 59, 80, 77, 114]}, "PC Proprietary D2D": {"total": 105, "monthly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 25, 30, 36, 14]}, "PC Proprietary Telesales": {"total": 857, "monthly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 158, 228, 224, 247]}, "RC Partner Network": {"total": 699, "monthly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 181, 194, 162, 162]}, "RC Proprietary Vip Network": {"total": 726, "monthly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 114, 190, 193, 229]}, "RCC": {"total": 141, "monthly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 25, 47, 26, 43]}}}}, "grand_monthly": [2040, 3759, 4670, 2257, 2354, 2163, 1505, 1066, 1394, 2052, 1550, 1902, 1704, 1820, 1696, 1378, 1249, 2055], "grand_total": 36614};
+
+const MONTHS = DATA.months.map(m => m.replace(' - ', ' '));
+const CATS = Object.keys(DATA.categories);
+const PALETTE = ['#6ee7d6','#f5a55a','#c084fc','#f06868','#7ea6ff','#e6d35a'];
+const CH_PALETTE = ['#6ee7d6','#f5a55a','#c084fc','#f06868','#7ea6ff','#e6d35a','#5fd1ff','#ff9bd2','#9bf07c','#bdbdbd'];
+const OLD_TARIFFS = ['TAMAN MALA','TAMAN SREDNJA','TAMAN VELIKA'];
+const NEW_TARIFFS = ['Druga +','Prva +','Treća +'];
+
+function fmt(n){return Math.round(n).toLocaleString('en-US');}
+function sumArr(a,b){return a.map((v,i)=>v+(b[i]||0));}
+
+function allChannels(){
+  const ch = {};
+  CATS.forEach(c=>{
+    Object.entries(DATA.categories[c].channels).forEach(([name,d])=>{
+      if(!ch[name]) ch[name] = new Array(18).fill(0);
+      ch[name] = sumArr(ch[name], d.monthly);
+    });
+  });
+  return ch;
+}
+const CHANNELS = allChannels();
+const CHANNEL_NAMES = Object.keys(CHANNELS).sort((a,b)=> CHANNELS[b].reduce((x,y)=>x+y,0) - CHANNELS[a].reduce((x,y)=>x+y,0));
+
+const tooltip = document.getElementById('tooltip');
+function showTip(evt, html){
+  tooltip.innerHTML = html;
+  tooltip.style.display = 'block';
+  tooltip.style.left = (evt.clientX + 14) + 'px';
+  tooltip.style.top = (evt.clientY + 14) + 'px';
+}
+function hideTip(){ tooltip.style.display = 'none'; }
+
+// ============ SVG CHART PRIMITIVES ============
+const NS = 'http://www.w3.org/2000/svg';
+function svgEl(tag, attrs){
+  const el = document.createElementNS(NS, tag);
+  for(const k in attrs) el.setAttribute(k, attrs[k]);
+  return el;
+}
+
+function lineChart(container, labels, series, opts={}){
+  const W = opts.width || 1000, H = opts.height || 280;
+  const padL = 46, padR = 14, padT = 14, padB = 56;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const allVals = series.flatMap(s=>s.data);
+  const maxV = Math.max(1, ...allVals) * 1.12;
+  const svg = svgEl('svg', {viewBox:`0 0 ${W} ${H}`, preserveAspectRatio:'none'});
+  const n = labels.length;
+  const xStep = innerW / (n-1);
+  const yScale = v => padT + innerH - (v/maxV)*innerH;
+  const xScale = i => padL + i*xStep;
+
+  const gridN = 4;
+  for(let i=0;i<=gridN;i++){
+    const y = padT + innerH - (i/gridN)*innerH;
+    svg.appendChild(svgEl('line', {x1:padL,y1:y,x2:W-padR,y2:y,class:'grid-line'}));
+    const val = (maxV/gridN*i);
+    const t = svgEl('text', {x:padL-8, y:y+4, 'text-anchor':'end', 'font-size':10});
+    t.textContent = fmt(val);
+    svg.appendChild(t);
+  }
+  labels.forEach((l,i)=>{
+    if(n>14 && i%2!==0) return;
+    const t = svgEl('text', {x:xScale(i), y:H-30, 'text-anchor':'end', 'font-size':9, transform:`rotate(-55 ${xScale(i)} ${H-30})`});
+    t.textContent = l;
+    svg.appendChild(t);
+  });
+
+  series.forEach(s=>{
+    let path = '';
+    s.data.forEach((v,i)=>{
+      path += (i===0?'M':'L') + xScale(i) + ' ' + yScale(v) + ' ';
+    });
+    if(s.fill){
+      let area = path + `L ${xScale(n-1)} ${yScale(0)} L ${xScale(0)} ${yScale(0)} Z`;
+      svg.appendChild(svgEl('path', {d:area, fill:s.color, 'fill-opacity':0.12, stroke:'none'}));
+    }
+    svg.appendChild(svgEl('path', {d:path, fill:'none', stroke:s.color, 'stroke-width':2, 'stroke-linejoin':'round'}));
+    s.data.forEach((v,i)=>{
+      const c = svgEl('circle', {cx:xScale(i), cy:yScale(v), r:3, fill:s.color, style:'cursor:pointer'});
+      c.addEventListener('mousemove', (e)=>showTip(e, `<b>${labels[i]}</b><br>${s.label}: ${fmt(v)}`));
+      c.addEventListener('mouseleave', hideTip);
+      svg.appendChild(c);
+    });
+  });
+
+  container.innerHTML='';
+  container.appendChild(svg);
+  if(series.length>1) addLegend(container, series.map(s=>({label:s.label,color:s.color})));
+}
+
+function barChartV(container, labels, series, opts={}){
+  const W = opts.width || 1000, H = opts.height || 280;
+  const padL = 46, padR = 14, padT = 14, padB = 56;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const stacked = opts.stacked;
+  const n = labels.length;
+  let maxV;
+  if(stacked){
+    maxV = Math.max(...labels.map((_,i)=>series.reduce((s,ser)=>s+ser.data[i],0))) * 1.1;
+  } else {
+    maxV = Math.max(...series.flatMap(s=>s.data)) * 1.1;
+  }
+  maxV = Math.max(maxV, 1);
+  const svg = svgEl('svg', {viewBox:`0 0 ${W} ${H}`, preserveAspectRatio:'none'});
+  const yScale = v => padT + innerH - (v/maxV)*innerH;
+  const groupW = innerW/n;
+  const barW = stacked ? groupW*0.62 : (groupW*0.7)/series.length;
+
+  const gridN = 4;
+  for(let i=0;i<=gridN;i++){
+    const y = padT + innerH - (i/gridN)*innerH;
+    svg.appendChild(svgEl('line', {x1:padL,y1:y,x2:W-padR,y2:y,class:'grid-line'}));
+    const t = svgEl('text', {x:padL-8, y:y+4, 'text-anchor':'end', 'font-size':10});
+    t.textContent = fmt(maxV/gridN*i);
+    svg.appendChild(t);
+  }
+  labels.forEach((l,i)=>{
+    if(n>14 && i%2!==0) return;
+    const cx = padL + i*groupW + groupW/2;
+    const t = svgEl('text', {x:cx, y:H-30, 'text-anchor':'end', 'font-size':9, transform:`rotate(-55 ${cx} ${H-30})`});
+    t.textContent = l;
+    svg.appendChild(t);
+  });
+
+  labels.forEach((l,i)=>{
+    let yCursor = 0;
+    series.forEach((s,si)=>{
+      const v = s.data[i];
+      let x, w;
+      if(stacked){
+        x = padL + i*groupW + (groupW-barW)/2;
+        w = barW;
+        const y0 = yScale(yCursor), y1 = yScale(yCursor+v);
+        const rect = svgEl('rect', {x, y:y1, width:w, height:Math.max(0,y0-y1), fill:s.color, style:'cursor:pointer'});
+        rect.addEventListener('mousemove', (e)=>showTip(e, `<b>${l}</b><br>${s.label}: ${fmt(v)}`));
+        rect.addEventListener('mouseleave', hideTip);
+        svg.appendChild(rect);
+        yCursor += v;
+      } else {
+        x = padL + i*groupW + (groupW - series.length*barW)/2 + si*barW;
+        w = barW*0.85;
+        const y0 = yScale(0), y1 = yScale(v);
+        const rect = svgEl('rect', {x, y:y1, width:w, height:Math.max(0,y0-y1), fill:s.color, style:'cursor:pointer'});
+        rect.addEventListener('mousemove', (e)=>showTip(e, `<b>${l}</b><br>${s.label}: ${fmt(v)}`));
+        rect.addEventListener('mouseleave', hideTip);
+        svg.appendChild(rect);
+      }
+    });
+  });
+
+  container.innerHTML='';
+  container.appendChild(svg);
+  if(series.length>1) addLegend(container, series.map(s=>({label:s.label,color:s.color})));
+}
+
+function barChartH(container, items, opts={}){
+  const W = opts.width || 1000;
+  const rowH = 26;
+  const padL = opts.padL || 150, padR = 60, padT = 8, padB = 8;
+  const H = items.length*rowH + padT + padB;
+  const innerW = W - padL - padR;
+  const maxV = Math.max(...items.map(i=>i.value)) * 1.08 || 1;
+  const svg = svgEl('svg', {viewBox:`0 0 ${W} ${H}`, preserveAspectRatio:'none'});
+  items.forEach((it,i)=>{
+    const y = padT + i*rowH;
+    const w = (it.value/maxV)*innerW;
+    const lbl = svgEl('text', {x:padL-8, y:y+rowH*0.65, 'text-anchor':'end', 'font-size':11});
+    lbl.textContent = it.label;
+    svg.appendChild(lbl);
+    const rect = svgEl('rect', {x:padL, y:y+4, width:Math.max(2,w), height:rowH-10, rx:4, fill:it.color, style:'cursor:pointer'});
+    rect.addEventListener('mousemove', (e)=>showTip(e, `<b>${it.label}</b><br>${fmt(it.value)}`));
+    rect.addEventListener('mouseleave', hideTip);
+    svg.appendChild(rect);
+    const valTxt = svgEl('text', {x:padL+w+6, y:y+rowH*0.65, 'font-size':10.5, fill:'#e7eaf2'});
+    valTxt.textContent = fmt(it.value);
+    svg.appendChild(valTxt);
+  });
+  container.innerHTML='';
+  container.appendChild(svg);
+}
+
+function donutChart(container, items, opts={}){
+  const W = opts.width || 360, H = opts.height || 220;
+  const cx = H/2, cy = H/2, rOuter = H*0.40, rInner = rOuter*0.58;
+  const total = items.reduce((a,b)=>a+b.value,0) || 1;
+  const svg = svgEl('svg', {viewBox:`0 0 ${W} ${H}`, preserveAspectRatio:'xMinYMid meet'});
+  let angle = -Math.PI/2;
+  items.forEach(it=>{
+    const frac = it.value/total;
+    const a0 = angle, a1 = angle + frac*Math.PI*2;
+    angle = a1;
+    const x0o = cx+rOuter*Math.cos(a0), y0o = cy+rOuter*Math.sin(a0);
+    const x1o = cx+rOuter*Math.cos(a1), y1o = cy+rOuter*Math.sin(a1);
+    const x0i = cx+rInner*Math.cos(a1), y0i = cy+rInner*Math.sin(a1);
+    const x1i = cx+rInner*Math.cos(a0), y1i = cy+rInner*Math.sin(a0);
+    const large = (a1-a0) > Math.PI ? 1 : 0;
+    const d = `M ${x0o} ${y0o} A ${rOuter} ${rOuter} 0 ${large} 1 ${x1o} ${y1o} L ${x0i} ${y0i} A ${rInner} ${rInner} 0 ${large} 0 ${x1i} ${y1i} Z`;
+    const path = svgEl('path', {d, fill:it.color, stroke:'#0b0e14', 'stroke-width':2, style:'cursor:pointer'});
+    path.addEventListener('mousemove', (e)=>showTip(e, `<b>${it.label}</b><br>${fmt(it.value)} (${(frac*100).toFixed(1)}%)`));
+    path.addEventListener('mouseleave', hideTip);
+    svg.appendChild(path);
+  });
+  const totalTxt = svgEl('text', {x:cx, y:cy-2, 'text-anchor':'middle', 'font-size':14, 'font-weight':700, fill:'#e7eaf2'});
+  totalTxt.textContent = fmt(total);
+  svg.appendChild(totalTxt);
+  const subTxt = svgEl('text', {x:cx, y:cy+13, 'text-anchor':'middle', 'font-size':8});
+  subTxt.textContent = 'total';
+  svg.appendChild(subTxt);
+
+  const lx = H + 14;
+  const rowH = Math.min(18, (H-16)/items.length);
+  items.forEach((it,i)=>{
+    const ly = 14 + i*rowH;
+    if(ly > H-4) return;
+    svg.appendChild(svgEl('rect', {x:lx, y:ly-8, width:8, height:8, rx:2, fill:it.color}));
+    const frac = ((it.value/total)*100).toFixed(1);
+    const t = svgEl('text', {x:lx+13, y:ly, 'font-size':9.5});
+    const label = it.label.length>20 ? it.label.slice(0,18)+'…' : it.label;
+    t.textContent = `${label} — ${frac}%`;
+    svg.appendChild(t);
+  });
+
+  container.innerHTML='';
+  container.appendChild(svg);
+}
+
+function addLegend(container, items){
+  const div = document.createElement('div');
+  div.className = 'legend';
+  div.innerHTML = items.map(it=>`<span><i style="background:${it.color}"></i>${it.label}</span>`).join('');
+  container.appendChild(div);
+}
+
+// ============ KPI ROW ============
+const totalUnits = DATA.grand_total;
+const last3 = DATA.grand_monthly.slice(-3).reduce((a,b)=>a+b,0);
+const prev3 = DATA.grand_monthly.slice(-6,-3).reduce((a,b)=>a+b,0);
+const trendPct = (((last3-prev3)/prev3)*100).toFixed(1);
+const peakIdx = DATA.grand_monthly.indexOf(Math.max(...DATA.grand_monthly));
+const topChannel = CHANNEL_NAMES[0];
+
+document.getElementById('kpiRow').innerHTML = `
+  <div class="kpi"><div class="label">Total activations</div><div class="value accent">${fmt(totalUnits)}</div></div>
+  <div class="kpi"><div class="label">Peak month</div><div class="value">${MONTHS[peakIdx]}</div></div>
+  <div class="kpi"><div class="label">Last 3mo vs prior 3mo</div><div class="value ${trendPct<0?'warn':'accent'}">${trendPct>0?'+':''}${trendPct}%</div></div>
+  <div class="kpi"><div class="label">Top channel</div><div class="value" style="font-size:15px">${topChannel}</div></div>
+`;
+
+// ============ TABS / PANELS SCAFFOLD ============
+const tabDefs = [
+  {id:'overview', label:'Overview'},
+  {id:'segments', label:'Tariff Segments'},
+  {id:'channels', label:'Sales Channels'},
+  {id:'migration', label:'Tariff Migration'},
+  {id:'detail', label:'Segment Detail'},
+];
+document.getElementById('tabs').innerHTML = tabDefs.map((t,i)=>
+  `<button data-tab="${t.id}" class="${i===0?'active':''}">${t.label}</button>`).join('');
+
+document.getElementById('panels').innerHTML = `
+  <section class="tabpanel active" id="panel-overview">
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>Total monthly activations</h3>
+        <div class="sub">All segments combined, Jan 2025 – Jun 2026</div>
+        <div id="chartOverviewLine"></div>
+      </div>
+      <div class="card note">
+        <h3>Što ovi podaci pokazuju</h3>
+        <p>Ovo je evidencija mjesečnih aktivacija po tarifnim segmentima i prodajnim kanalima, od siječnja 2025. do lipnja 2026.
+        Praćeno je šest tarifnih kategorija (TAMAN MALA, TAMAN SREDNJA, TAMAN VELIKA te Prva+/Druga+/Treća+) kroz devet
+        prodajnih kanala (telesales, D2D, partnerske mreže, online, RCC i dr).</p>
+        <p style="margin-top:10px;"><strong>Zaključci iz analize:</strong></p>
+        <p style="margin-top:6px;">Apsolutno najbolje se prodavao segment <strong>TAMAN VELIKA</strong> — sam čini oko
+        <strong>68% svih aktivacija</strong> (~24.900 od ukupno 36.600 jedinica), daleko ispred ostalih segmenata.
+        Najjači mjesec u cijelom promatranom razdoblju bio je <strong>ožujak 2025.</strong> (4.670 aktivacija), s pravim
+        udarnim valom već od veljače 2025, ponajviše zahvaljujući naglom skoku TAMAN VELIKA prodaje preko kanala
+        <strong>PC Proprietary Telesales</strong> (851 u veljači, 1.428 u ožujku) i <strong>RC Partner Network</strong>a
+        (1.166 i 1.058). Taj je val jednako brzo splasnuo do ljeta 2025.</p>
+        <p style="margin-top:6px;">Gledano kroz cijelo razdoblje, najproduktivniji prodajni kanal je <strong>RC Partner Network</strong>
+        (~30% svih aktivacija), zatim <strong>PC Proprietary Telesales</strong> (~20%) i <strong>RC Proprietary Vip Network</strong> (~15%) —
+        zajedno čine dvije trećine prodaje. Online prodaja i partnerski D2D kanali ostaju znatno manji igrači.</p>
+        <p style="margin-top:6px;">U <strong>ožujku 2026.</strong> dolazi do jasnog reza: TAMAN tarife u potpunosti nestaju, a istog mjeseca
+        kreću Prva+/Druga+/Treća+ — gotovo sigurno isti proizvodi pod novim imenima, a ne tri ugašena i tri nova proizvoda
+        odjednom. Nakon rebrandinga ukupni mjesečni volumen je niži nego u udarnim mjesecima 2025. (prvih 6 mjeseci ~17.200
+        aktivacija nasuprot ~9.900 u posljednjih 6), što sugerira da prodaja nakon migracije tarifa još nije dosegla
+        razinu prethodnog vrhunca, iako je rast vidljiv iz mjeseca u mjesec nakon prijelaza.</p>
+      </div>
+    </div>
+    <div class="grid cols-2" style="margin-top:18px;">
+      <div class="card">
+        <h3>Segment share of total activations</h3>
+        <div class="sub">Jan 2025 – Jun 2026, all months combined</div>
+        <div id="chartOverviewDonut"></div>
+      </div>
+      <div class="card">
+        <h3>Channel share of total activations</h3>
+        <div class="sub">Same period, by sales channel</div>
+        <div id="chartOverviewChannelDonut"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="tabpanel" id="panel-segments">
+    <div class="card">
+      <h3>Activations by segment, month over month</h3>
+      <div class="sub">Stacked view — click a chip to isolate one segment</div>
+      <div class="chip-row" id="segChips"></div>
+      <div id="chartSegStack"></div>
+    </div>
+    <div class="grid cols-2" style="margin-top:18px;">
+      <div class="card">
+        <h3>Segment totals, ranked</h3>
+        <div class="sub">Full period</div>
+        <div id="chartSegBar"></div>
+      </div>
+      <div class="card">
+        <h3>Segment totals table</h3>
+        <div class="sub">Sortable reference</div>
+        <table id="segTable"><thead><tr><th>Segment</th><th>Total</th><th>% of all</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+  </section>
+
+  <section class="tabpanel" id="panel-channels">
+    <div class="card">
+      <h3>Top channels, month over month</h3>
+      <div class="sub">All segments combined — top 6 channels by volume</div>
+      <div id="chartChannelLine"></div>
+    </div>
+    <div class="grid cols-2" style="margin-top:18px;">
+      <div class="card">
+        <h3>Channel totals, ranked</h3>
+        <div id="chartChannelBar"></div>
+      </div>
+      <div class="card">
+        <h3>Channel mix has shifted</h3>
+        <div class="sub">Share of monthly volume by channel — first 6 vs last 6 months</div>
+        <div id="chartChannelShift"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="tabpanel" id="panel-migration">
+    <div class="card">
+      <h3>Old tariffs (TAMAN family) vs new tariffs (Prva+/Druga+/Treća+)</h3>
+      <div class="sub">The handover happens in March 2026 — old names wind down as new names ramp up</div>
+      <div id="chartMigration"></div>
+    </div>
+    <div class="card note" style="margin-top:18px;">
+      <p><strong>Reading the handover:</strong> TAMAN MALA / SREDNJA / VELIKA activations run from Jan 2025 through Mar 2026,
+      then drop to zero. Prva+, Druga+ and Treća+ activations begin in Mar 2026 and ramp through Jun 2026. This is almost
+      certainly the same products under a rebrand, not three retired tariffs and three brand-new ones launching simultaneously.
+      Combined volume across both naming schemes stayed roughly in the
+      <strong>${fmt(Math.min(...DATA.grand_monthly.slice(12)))}–${fmt(Math.max(...DATA.grand_monthly.slice(12)))}</strong>
+      monthly range after the transition, comparable to pre-transition levels.</p>
+    </div>
+  </section>
+
+  <section class="tabpanel" id="panel-detail">
+    <div class="card">
+      <div class="cat-select" id="catSelect"></div>
+      <h3 id="detailTitle">Segment detail</h3>
+      <div class="sub" id="detailSub"></div>
+      <div id="chartDetailLine"></div>
+    </div>
+    <div class="grid cols-2" style="margin-top:18px;">
+      <div class="card">
+        <h3>Channel breakdown</h3>
+        <div class="sub">Total units per channel for this segment</div>
+        <div id="chartDetailChannels"></div>
+      </div>
+      <div class="card">
+        <h3>Channel totals table</h3>
+        <table id="detailTable"><thead><tr><th>Channel</th><th>Total</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+  </section>
+`;
+
+document.querySelectorAll('nav button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.tabpanel').forEach(p=>p.classList.remove('active'));
+    document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ============ OVERVIEW ============
+lineChart(document.getElementById('chartOverviewLine'), MONTHS,
+  [{label:'Total activations', data:DATA.grand_monthly, color:'#6ee7d6', fill:true}], {height:260});
+
+donutChart(document.getElementById('chartOverviewDonut'),
+  CATS.map((c,i)=>({label:c, value:DATA.categories[c].total, color:PALETTE[i]})), {height:200});
+
+donutChart(document.getElementById('chartOverviewChannelDonut'),
+  CHANNEL_NAMES.map((c,i)=>({label:c, value:CHANNELS[c].reduce((a,b)=>a+b,0), color:CH_PALETTE[i]})), {height:200});
+
+// ============ SEGMENTS ============
+document.getElementById('segChips').innerHTML = CATS.map((c,i)=>
+  `<span class="chip" data-cat="${c}" style="border-color:${PALETTE[i]}88">${c}</span>`).join('');
+
+function renderSegStack(isolated){
+  const cats = isolated ? [isolated] : CATS;
+  const series = cats.map(c=>({label:c, data:DATA.categories[c].monthly, color:PALETTE[CATS.indexOf(c)]}));
+  barChartV(document.getElementById('chartSegStack'), MONTHS, series, {height:300, stacked:true});
+}
+renderSegStack(null);
+let isolated = null;
+document.querySelectorAll('#segChips .chip').forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    const cat = chip.dataset.cat;
+    if(isolated === cat){ isolated = null; document.querySelectorAll('#segChips .chip').forEach(c=>c.classList.remove('active')); }
+    else { isolated = cat; document.querySelectorAll('#segChips .chip').forEach(c=>c.classList.remove('active')); chip.classList.add('active'); }
+    renderSegStack(isolated);
+  });
+});
+
+const segSorted = [...CATS].sort((a,b)=>DATA.categories[b].total - DATA.categories[a].total);
+barChartH(document.getElementById('chartSegBar'),
+  segSorted.map(c=>({label:c, value:DATA.categories[c].total, color:PALETTE[CATS.indexOf(c)]})), {height:220});
+
+const segTableBody = document.querySelector('#segTable tbody');
+segSorted.forEach(c=>{
+  const pct = ((DATA.categories[c].total/totalUnits)*100).toFixed(1);
+  segTableBody.innerHTML += `<tr><td>${c}</td><td class="total">${fmt(DATA.categories[c].total)}</td><td>${pct}%</td></tr>`;
+});
+
+// ============ CHANNELS ============
+lineChart(document.getElementById('chartChannelLine'), MONTHS,
+  CHANNEL_NAMES.slice(0,6).map((c,i)=>({label:c, data:CHANNELS[c], color:CH_PALETTE[i]})), {height:300});
+
+barChartH(document.getElementById('chartChannelBar'),
+  CHANNEL_NAMES.map((c,i)=>({label:c, value:CHANNELS[c].reduce((a,b)=>a+b,0), color:CH_PALETTE[i]})), {height:240});
+
+const firstHalf = {}, secondHalf = {};
+CHANNEL_NAMES.forEach(c=>{
+  firstHalf[c] = CHANNELS[c].slice(0,6).reduce((a,b)=>a+b,0);
+  secondHalf[c] = CHANNELS[c].slice(-6).reduce((a,b)=>a+b,0);
+});
+const fhTotal = Object.values(firstHalf).reduce((a,b)=>a+b,0);
+const shTotal = Object.values(secondHalf).reduce((a,b)=>a+b,0);
+barChartV(document.getElementById('chartChannelShift'), CHANNEL_NAMES.map(c=>c.length>14?c.slice(0,13)+'…':c),
+  [
+    {label:'First 6 months', data:CHANNEL_NAMES.map(c=>+(firstHalf[c]/fhTotal*100).toFixed(1)), color:'#3d4a63'},
+    {label:'Last 6 months', data:CHANNEL_NAMES.map(c=>+(secondHalf[c]/shTotal*100).toFixed(1)), color:'#6ee7d6'}
+  ], {height:260});
+
+// ============ MIGRATION ============
+const oldTotal = OLD_TARIFFS.reduce((acc,c)=>sumArr(acc, DATA.categories[c].monthly), new Array(18).fill(0));
+const newTotal = NEW_TARIFFS.reduce((acc,c)=>sumArr(acc, DATA.categories[c].monthly), new Array(18).fill(0));
+barChartV(document.getElementById('chartMigration'), MONTHS,
+  [
+    {label:'Old tariffs (TAMAN MALA/SREDNJA/VELIKA)', data:oldTotal, color:'#3d4a63'},
+    {label:'New tariffs (Prva+/Druga+/Treća+)', data:newTotal, color:'#6ee7d6'}
+  ], {height:300, stacked:true});
+
+// ============ DETAIL ============
+document.getElementById('catSelect').innerHTML = CATS.map((c,i)=>
+  `<button class="cat-btn ${i===0?'active':''}" data-cat="${c}">${c}</button>`).join('');
+
+function renderDetail(cat){
+  const d = DATA.categories[cat];
+  document.getElementById('detailTitle').textContent = cat + ' — monthly activations';
+  document.getElementById('detailSub').textContent = `Total: ${fmt(d.total)} units · ${(d.total/totalUnits*100).toFixed(1)}% of all activations`;
+
+  lineChart(document.getElementById('chartDetailLine'), MONTHS,
+    [{label:cat, data:d.monthly, color:'#f5a55a', fill:true}], {height:260});
+
+  const chSorted = Object.entries(d.channels).sort((a,b)=>b[1].total - a[1].total);
+  barChartH(document.getElementById('chartDetailChannels'),
+    chSorted.map(([name,v],i)=>({label:name, value:v.total, color:CH_PALETTE[CHANNEL_NAMES.indexOf(name)] || '#c084fc'})), {height:240});
+
+  document.querySelector('#detailTable tbody').innerHTML = chSorted.map(c=>
+    `<tr><td>${c[0]}</td><td class="total">${fmt(c[1].total)}</td></tr>`).join('');
+}
+renderDetail(CATS[0]);
+document.querySelectorAll('.cat-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    renderDetail(btn.dataset.cat);
+  });
+});
+</script>
+</body>
+</html>
